@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Dashboard - Choremate</title>
+</head>
+<body>
+    <main>
+        <h1>Dashboard</h1>
+        <p>Current week: {{ week_start }} to {{ week_end }}</p>
+        <p>Effort points describe workload measurement, not scores or rankings.</p>
+        <section aria-labelledby="workload-heading">
+            <h2 id="workload-heading">Planned and actual workload</h2>
+            <table>
+                <caption>Workload for the current Monday-to-Sunday week</caption>
+                <thead>
+                    <tr>
+                        <th scope="col">Member</th>
+                        <th scope="col">Planned effort</th>
+                        <th scope="col">Planned share</th>
+                        <th scope="col">Completed effort</th>
+                        <th scope="col">Actual share</th>
+                        <th scope="col">Chores completed</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for member, totals in rows %}
+                        <tr>
+                            <th scope="row">{{ member.name }}</th>
+                            <td>{{ totals.planned_effort_points }}</td>
+                            <td>{{ totals.planned_percentage }}%</td>
+                            <td>{{ totals.actual_effort_points }}</td>
+                            <td>{{ totals.actual_percentage }}%</td>
+                            <td>{{ totals.completed_chore_count }}</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </section>
+        <p><a href="{% url 'chores:home' %}">Back to Choremate</a></p>
+    </main>
+</body>
+</html>

@@ -19,6 +19,7 @@ from .models import ChoreAssignment, ChoreDefinition, ChoreOccurrence, Household
 from .catalog import CATALOG, CATALOG_BY_SLUG
 from .services import (
     cancel_occurrence,
+    calculate_workload,
     complete_occurrence,
     create_one_time_occurrence,
     generate_occurrences_for_week,
@@ -218,6 +219,25 @@ def today(request):
             (occurrence, OccurrenceAssignmentForm(initial={"member": getattr(assignment, "member_id", None)}), CompletionForm(), RescheduleForm(initial={"due_date": occurrence.due_date}))
         )
     return render(request, "chores/today.html", {"rows": rows, "form": TodayOneTimeForm(), "today": current_day})
+
+
+def dashboard(request):
+    if HouseholdMember.objects.count() != 2:
+        return redirect("chores:setup")
+    start = week_start_for()
+    end = start + timedelta(days=6)
+    generate_occurrences_for_week(start)
+    occurrences = ChoreOccurrence.objects.filter(due_date__range=(start, end)).select_related(
+        "assignment", "completion"
+    )
+    totals = calculate_workload(occurrences)
+    members = HouseholdMember.objects.order_by("id")
+    rows = [(member, totals[member.id]) for member in members]
+    return render(
+        request,
+        "chores/dashboard.html",
+        {"week_start": start, "week_end": end, "rows": rows},
+    )
 
 
 def today_action(request, pk):

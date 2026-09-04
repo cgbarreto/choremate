@@ -692,6 +692,59 @@ class TodayViewTests(TestCase):
         self.assertTrue(ChoreOccurrence.objects.filter(chore_name="Buy milk", due_date=date(2026, 9, 4)).exists())
 
 
+class DashboardViewTests(TestCase):
+    def setUp(self):
+        self.alex = HouseholdMember.objects.create(name="Alex")
+        self.sam = HouseholdMember.objects.create(name="Sam")
+        self.definition = ChoreDefinition.objects.create(
+            name="Dashboard chore",
+            category=ChoreDefinition.Category.OTHER,
+            effort_score=4,
+            priority=ChoreDefinition.Priority.MEDIUM,
+            recurrence=ChoreDefinition.Recurrence.ONE_TIME,
+            assignment_type=ChoreDefinition.AssignmentType.UNASSIGNED,
+        )
+
+    def make_occurrence(self, due_date, status=ChoreOccurrence.Status.PENDING):
+        return ChoreOccurrence.objects.create(
+            definition=self.definition, due_date=due_date, status=status,
+            chore_name=self.definition.name, category=self.definition.category,
+            effort_score=self.definition.effort_score, priority=self.definition.priority,
+            recurrence=self.definition.recurrence,
+        )
+
+    def test_dashboard_shows_current_week_and_planned_actual_values(self):
+        planned = self.make_occurrence(date(2026, 9, 1))
+        ChoreAssignment.objects.create(occurrence=planned, member=self.alex)
+        completed = self.make_occurrence(date(2026, 9, 2), ChoreOccurrence.Status.COMPLETED)
+        ChoreCompletion.objects.create(
+            occurrence=completed, completed_by=self.sam,
+            completed_at=datetime(2026, 9, 2, 12, tzinfo=timezone.utc),
+        )
+
+        with patch("chores.views.date") as mocked_date:
+            mocked_date.today.return_value = date(2026, 9, 4)
+            response = self.client.get("/dashboard/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Current week: Aug. 31, 2026 to Sept. 6, 2026")
+        self.assertContains(response, "Alex")
+        self.assertContains(response, "Sam")
+        self.assertContains(response, "Planned effort")
+        self.assertContains(response, "Completed effort")
+        self.assertContains(response, "100.0%")
+
+    def test_dashboard_keeps_zero_workload_member_visible(self):
+        with patch("chores.views.date") as mocked_date:
+            mocked_date.today.return_value = date(2026, 9, 4)
+            response = self.client.get("/dashboard/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Alex")
+        self.assertContains(response, "Sam")
+        self.assertContains(response, "0%")
+
+
 class PersistenceBoundaryTests(TestCase):
     def setUp(self):
         self.member = HouseholdMember.objects.create(name="Alex")
