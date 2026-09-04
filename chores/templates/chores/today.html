@@ -18,9 +18,18 @@
                             <h2 id="today-occurrence-{{ occurrence.id }}">{{ occurrence.chore_name }}</h2>
                             <p>Due: {{ occurrence.due_date }} · {{ occurrence.priority }} priority · {{ occurrence.effort_score }} effort · Status: {{ occurrence.status }}</p>
                             {% if occurrence.assignment %}<p>Assigned to: {{ occurrence.assignment.member.name }}</p>{% else %}<p>Assigned to: Unassigned</p>{% endif %}
-                            {% if not occurrence.assignment %}
-                                <p><a href="{% url 'chores:occurrences' %}">Claim this chore</a></p>
-                            {% endif %}
+                            <form method="post" action="{% url 'chores:assign_occurrence' occurrence.id %}">
+                                {% csrf_token %}
+                                {{ assignment_form.member.label_tag }} {{ assignment_form.member }}
+                                <input type="hidden" name="next" value="today">
+                                {% if occurrence.assignment %}
+                                    <input type="hidden" name="action" value="reassign">
+                                    <button type="submit">Reassign</button>
+                                {% else %}
+                                    <input type="hidden" name="action" value="claim">
+                                    <button type="submit">Claim</button>
+                                {% endif %}
+                            </form>
                             {% if occurrence.status != 'completed' and occurrence.status != 'cancelled' %}
                                 <form method="post" action="{% url 'chores:today_action' occurrence.id %}">
                                     {% csrf_token %}{{ completion_form.member.label_tag }} {{ completion_form.member }}

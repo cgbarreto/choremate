@@ -131,7 +131,10 @@ def occurrences(request):
 
 
 def assign_occurrence(request, pk):
-    next_page = "chores:week" if request.POST.get("next") == "week" else "chores:occurrences"
+    next_page = {
+        "week": "chores:week",
+        "today": "chores:today",
+    }.get(request.POST.get("next"), "chores:occurrences")
     if request.method != "POST":
         return redirect(next_page)
     occurrence = get_object_or_404(ChoreOccurrence, pk=pk)

@@ -635,6 +635,51 @@ class TodayViewTests(TestCase):
         other.refresh_from_db()
         self.assertEqual(other.status, ChoreOccurrence.Status.CANCELLED)
 
+    def test_today_can_claim_and_reassign_an_occurrence(self):
+        occurrence = self.make_occurrence(date(2026, 9, 4))
+
+        response = self.client.post(
+            f"/occurrences/{occurrence.id}/assign/",
+            {"action": "claim", "member": self.alex.id, "next": "today"},
+        )
+        self.assertRedirects(response, "/today/")
+        occurrence.refresh_from_db()
+        self.assertEqual(occurrence.assignment.member, self.alex)
+
+        response = self.client.post(
+            f"/occurrences/{occurrence.id}/assign/",
+            {"action": "reassign", "member": self.sam.id, "next": "today"},
+        )
+        self.assertRedirects(response, "/today/")
+        occurrence.refresh_from_db()
+        self.assertEqual(occurrence.assignment.member, self.sam)
+
+    def test_today_renders_inline_assignment_controls(self):
+        assigned = self.make_occurrence(date(2026, 9, 4))
+        ChoreAssignment.objects.create(occurrence=assigned, member=self.alex)
+        other_definition = ChoreDefinition.objects.create(
+            name="Another today chore",
+            category=ChoreDefinition.Category.OTHER,
+            effort_score=1,
+            priority=ChoreDefinition.Priority.LOW,
+            recurrence=ChoreDefinition.Recurrence.ONE_TIME,
+            assignment_type=ChoreDefinition.AssignmentType.UNASSIGNED,
+        )
+        ChoreOccurrence.objects.create(
+            definition=other_definition,
+            due_date=date(2026, 9, 4),
+            chore_name=other_definition.name,
+            category=other_definition.category,
+            effort_score=other_definition.effort_score,
+            priority=other_definition.priority,
+            recurrence=other_definition.recurrence,
+        )
+
+        response = self.client.get("/today/")
+
+        self.assertContains(response, "Reassign")
+        self.assertContains(response, "Claim")
+
     def test_today_adds_a_one_time_chore_for_today(self):
         with patch("chores.views.date") as mocked_date:
             mocked_date.today.return_value = date(2026, 9, 4)
