@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Set up Choremate</title>
+</head>
+<body>
+    <main>
+        <h1>Set up your household</h1>
+        <p>Enter the names of the two people sharing household chores.</p>
+        <form method="post">
+            {% csrf_token %}
+            {{ form.non_field_errors }}
+            {% for field in form %}
+                <p>
+                    {{ field.label_tag }}
+                    {{ field }}
+                    {{ field.errors }}
+                </p>
+            {% endfor %}
+            <button type="submit">Continue</button>
+        </form>
+    </main>
+</body>
+</html>

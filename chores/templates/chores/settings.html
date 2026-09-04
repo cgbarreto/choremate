@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Settings - Choremate</title>
+</head>
+<body>
+    <main>
+        <h1>Settings</h1>
+        {% if messages %}
+            {% for message in messages %}
+                <p role="status">{{ message }}</p>
+            {% endfor %}
+        {% endif %}
+        {% for member, form in member_forms %}
+            <section aria-labelledby="member-{{ member.id }}-heading">
+                <h2 id="member-{{ member.id }}-heading">{{ member.name }}</h2>
+                <form method="post">
+                    {% csrf_token %}
+                    <input type="hidden" name="member_id" value="{{ member.id }}">
+                    {{ form.name.label_tag }}
+                    {{ form.name }}
+                    {{ form.name.errors }}
+                    <button type="submit">Save name</button>
+                </form>
+            </section>
+        {% endfor %}
+        <a href="{% url 'chores:home' %}">Back to Choremate</a>
+    </main>
+</body>
+</html>

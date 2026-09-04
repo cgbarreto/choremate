@@ -1,5 +1,78 @@
-from django.shortcuts import render
+from django.contrib import messages
+from django.db import transaction
+from django.shortcuts import get_object_or_404, redirect, render
+
+from .forms import HouseholdSetupForm, MemberRenameForm
+from .models import HouseholdMember
 
 
 def home(request):
-    return render(request, "chores/home.html")
+    members = list(HouseholdMember.objects.all())
+    if len(members) != 2:
+        return redirect("chores:setup")
+
+    active_member_id = request.session.get("active_member_id")
+    if active_member_id not in {member.id for member in members}:
+        active_member_id = members[0].id
+        request.session["active_member_id"] = active_member_id
+
+    return render(
+        request,
+        "chores/home.html",
+        {"members": members, "active_member_id": active_member_id},
+    )
+
+
+def setup(request):
+    if HouseholdMember.objects.count() >= 2:
+        return redirect("chores:home")
+
+    form = HouseholdSetupForm(request.POST or None)
+    if request.method == "POST" and form.is_valid():
+        with transaction.atomic():
+            members = [
+                HouseholdMember.objects.create(name=form.cleaned_data["member_one"]),
+                HouseholdMember.objects.create(name=form.cleaned_data["member_two"]),
+            ]
+        request.session["active_member_id"] = members[0].id
+        messages.success(request, "Household setup complete.")
+        return redirect("chores:home")
+
+    return render(request, "chores/setup.html", {"form": form})
+
+
+def select_member(request):
+    if request.method != "POST":
+        return redirect("chores:home")
+
+    member = get_object_or_404(HouseholdMember, pk=request.POST.get("member_id"))
+    request.session["active_member_id"] = member.id
+    return redirect("chores:home")
+
+
+def settings(request):
+    members = list(HouseholdMember.objects.all())
+    if len(members) != 2:
+        return redirect("chores:setup")
+
+    selected_member_id = request.POST.get("member_id") if request.method == "POST" else None
+    forms = {
+        member.id: MemberRenameForm(
+            request.POST if request.method == "POST" and str(member.id) == selected_member_id else None,
+            prefix=f"member-{member.id}",
+            initial={"name": member.name},
+        )
+        for member in members
+    }
+
+    if request.method == "POST":
+        member = get_object_or_404(HouseholdMember, pk=selected_member_id)
+        member_form = forms[member.id]
+        if member_form.is_valid():
+            member.name = member_form.cleaned_data["name"]
+            member.save(update_fields=["name", "updated_at"])
+            messages.success(request, "Member name updated.")
+            return redirect("chores:settings")
+
+    member_forms = [(member, forms[member.id]) for member in members]
+    return render(request, "chores/settings.html", {"member_forms": member_forms})
