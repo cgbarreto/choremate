@@ -13,4 +13,6 @@ urlpatterns = [
     path("library/add/", views.chore_create, name="chore_create"),
     path("library/<int:pk>/edit/", views.chore_edit, name="chore_edit"),
     path("library/<int:pk>/toggle/", views.chore_toggle, name="chore_toggle"),
+    path("library/catalog/", views.catalog, name="catalog"),
+    path("library/catalog/<slug:slug>/add/", views.catalog_add, name="catalog_add"),
 ]

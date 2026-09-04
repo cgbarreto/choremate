@@ -14,6 +14,7 @@
             {% endfor %}
         {% endif %}
         <p><a href="{% url 'chores:chore_create' %}">Add chore</a></p>
+        <p><a href="{% url 'chores:catalog' %}">Browse chore catalog</a></p>
         {% if chores %}
             <ul>
                 {% for chore in chores %}

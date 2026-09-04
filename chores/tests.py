@@ -196,6 +196,49 @@ class ChoreLibraryTests(TestCase):
         self.assertEqual(occurrence.effort_score, 4)
 
 
+class ChoreCatalogTests(TestCase):
+    def setUp(self):
+        HouseholdMember.objects.create(name="Alex")
+        HouseholdMember.objects.create(name="Sam")
+
+    def test_catalog_shows_required_categories_and_examples(self):
+        response = self.client.get("/library/catalog/")
+
+        self.assertEqual(response.status_code, 200)
+        for template_name in (
+            "Clean bathroom",
+            "Vacuum floors",
+            "Wash clothes",
+            "Wash dishes",
+            "Grocery shopping",
+            "Take out trash",
+        ):
+            self.assertContains(response, template_name)
+        for category in ("cleaning", "laundry", "kitchen", "shopping", "maintenance"):
+            self.assertContains(response, category)
+
+    def test_adding_template_creates_a_normal_editable_chore(self):
+        response = self.client.post("/library/catalog/clean-bathroom/add/")
+
+        self.assertRedirects(response, "/library/")
+        chore = ChoreDefinition.objects.get(name="Clean bathroom")
+        self.assertEqual(chore.description, "Clean the bathroom surfaces and fixtures.")
+        self.assertEqual(chore.assignment_type, ChoreDefinition.AssignmentType.UNASSIGNED)
+        self.assertTrue(chore.is_active)
+
+    def test_adding_the_same_template_does_not_create_a_duplicate(self):
+        self.client.post("/library/catalog/clean-bathroom/add/")
+        self.client.post("/library/catalog/clean-bathroom/add/")
+
+        self.assertEqual(ChoreDefinition.objects.filter(name="Clean bathroom").count(), 1)
+
+    def test_invalid_template_does_not_create_a_chore(self):
+        response = self.client.post("/library/catalog/not-a-template/add/", follow=True)
+
+        self.assertContains(response, "could not be found")
+        self.assertEqual(ChoreDefinition.objects.count(), 0)
+
+
 class PersistenceBoundaryTests(TestCase):
     def setUp(self):
         self.member = HouseholdMember.objects.create(name="Alex")

@@ -4,6 +4,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 
 from .forms import ChoreDefinitionForm, HouseholdSetupForm, MemberRenameForm
 from .models import ChoreDefinition, HouseholdMember
+from .catalog import CATALOG, CATALOG_BY_SLUG
 
 
 def home(request):
@@ -60,6 +61,41 @@ def chore_toggle(request, pk):
     chore.is_active = not chore.is_active
     chore.save(update_fields=["is_active", "updated_at"])
     messages.success(request, f"Chore {'activated' if chore.is_active else 'deactivated'}.")
+    return redirect("chores:library")
+
+
+def catalog(request):
+    if HouseholdMember.objects.count() != 2:
+        return redirect("chores:setup")
+    return render(request, "chores/catalog.html", {"templates": CATALOG})
+
+
+def catalog_add(request, slug):
+    if request.method != "POST":
+        return redirect("chores:catalog")
+    if HouseholdMember.objects.count() != 2:
+        return redirect("chores:setup")
+
+    template = CATALOG_BY_SLUG.get(slug)
+    if template is None:
+        messages.error(request, "That catalog template could not be found.")
+        return redirect("chores:catalog")
+
+    chore, created = ChoreDefinition.objects.get_or_create(
+        name=template["name"],
+        defaults={
+            "description": template["description"],
+            "category": template["category"],
+            "effort_score": 3,
+            "priority": ChoreDefinition.Priority.MEDIUM,
+            "recurrence": ChoreDefinition.Recurrence.WEEKLY,
+            "assignment_type": ChoreDefinition.AssignmentType.UNASSIGNED,
+        },
+    )
+    if created:
+        messages.success(request, f"{chore.name} added to your Chore Library.")
+    else:
+        messages.info(request, f"{chore.name} is already in your Chore Library.")
     return redirect("chores:library")
 
 

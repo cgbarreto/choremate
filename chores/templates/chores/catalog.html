@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Chore Catalog - Choremate</title>
+</head>
+<body>
+    <main>
+        <h1>Chore Catalog</h1>
+        <p>Choose a template to add an editable chore to your library.</p>
+        {% if messages %}
+            {% for message in messages %}
+                <p role="status">{{ message }}</p>
+            {% endfor %}
+        {% endif %}
+        {% if templates %}
+            <ul>
+                {% for template in templates %}
+                    <li>
+                        <article aria-labelledby="template-{{ template.slug }}-name">
+                            <h2 id="template-{{ template.slug }}-name">{{ template.name }}</h2>
+                            <p>{{ template.description }}</p>
+                            <p>Category: {{ template.category }}</p>
+                            <form method="post" action="{% url 'chores:catalog_add' template.slug %}">
+                                {% csrf_token %}
+                                <button type="submit">Add to Chore Library</button>
+                            </form>
+                        </article>
+                    </li>
+                {% endfor %}
+            </ul>
+        {% else %}
+            <p>No catalog templates are available. You can still <a href="{% url 'chores:chore_create' %}">create a chore manually</a>.</p>
+        {% endif %}
+        <p><a href="{% url 'chores:library' %}">Back to Chore Library</a></p>
+    </main>
+</body>
+</html>
