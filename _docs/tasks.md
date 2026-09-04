@@ -1,8 +1,8 @@
 # MVP Backlog Mirror
 
 GitHub issues are the primary source of truth for this backlog. This file is a
-local mirror of the issues created from [`_docs/plan.md`](plan.md). Grooming has
-not been performed yet.
+local mirror of the issues created from [`_docs/plan.md`](plan.md). All current
+issues have been groomed using [`_docs/task-template.md`](task-template.md).
 
 ## Open backlog
 
