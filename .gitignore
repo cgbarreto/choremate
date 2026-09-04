@@ -1,0 +1,25 @@
+# Python virtual environments
+.venv/
+venv/
+
+# Python caches and generated files
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+
+# Local SQLite database
+*.sqlite3
+*.sqlite3-journal
+
+# Django generated files
+media/
+staticfiles/
+
+# macOS
+.DS_Store
+
+# Environment variables
+.env
+.env.*
+!.env.example
