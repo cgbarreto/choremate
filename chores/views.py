@@ -1,4 +1,4 @@
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 
 from django.contrib import messages
 from django.db import transaction
@@ -15,7 +15,7 @@ from .forms import (
     RescheduleForm,
     TodayOneTimeForm,
 )
-from .models import ChoreAssignment, ChoreDefinition, ChoreOccurrence, HouseholdMember
+from .models import ChoreAssignment, ChoreDefinition, ChoreOccurrence, HouseholdMember, WeeklySummary
 from .catalog import CATALOG, CATALOG_BY_SLUG
 from .services import (
     cancel_occurrence,
@@ -25,6 +25,7 @@ from .services import (
     generate_occurrences_for_week,
     refresh_overdue_occurrences,
     reschedule_occurrence,
+    persist_closed_week_summaries,
     week_start_for,
 )
 
@@ -237,6 +238,52 @@ def dashboard(request):
         request,
         "chores/dashboard.html",
         {"week_start": start, "week_end": end, "rows": rows},
+    )
+
+
+def history(request):
+    if HouseholdMember.objects.count() != 2:
+        return redirect("chores:setup")
+    current_day = date.today()
+    persist_closed_week_summaries(current_day)
+    week_starts = list(WeeklySummary.objects.values_list("week_start", flat=True).distinct())
+    selected_start = None
+    requested_start = request.GET.get("week")
+    if requested_start:
+        try:
+            candidate = datetime.strptime(requested_start, "%Y-%m-%d").date()
+            if candidate.weekday() == 0 and candidate in week_starts:
+                selected_start = candidate
+        except ValueError:
+            pass
+    selected_start = selected_start or (week_starts[0] if week_starts else None)
+    summary_rows = []
+    completed_occurrences = []
+    if selected_start:
+        summaries = {
+            summary.member_id: summary
+            for summary in WeeklySummary.objects.filter(week_start=selected_start).select_related("member")
+        }
+        planned_total = sum(summary.planned_effort_points for summary in summaries.values())
+        actual_total = sum(summary.actual_effort_points for summary in summaries.values())
+        for summary in summaries.values():
+            summary.planned_percentage = round(summary.planned_effort_points * 100 / planned_total, 2) if planned_total else 0
+            summary.actual_percentage = round(summary.actual_effort_points * 100 / actual_total, 2) if actual_total else 0
+        summary_rows = [(member, summaries.get(member.id)) for member in HouseholdMember.objects.order_by("id")]
+        completed_occurrences = ChoreOccurrence.objects.filter(
+            due_date__range=(selected_start, selected_start + timedelta(days=6)),
+            status=ChoreOccurrence.Status.COMPLETED,
+        ).select_related("completion__completed_by")
+    return render(
+        request,
+        "chores/history.html",
+        {
+            "week_starts": week_starts,
+            "selected_start": selected_start,
+            "selected_end": selected_start + timedelta(days=6) if selected_start else None,
+            "summary_rows": summary_rows,
+            "completed_occurrences": completed_occurrences,
+        },
     )
 
 

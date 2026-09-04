@@ -20,6 +20,7 @@ from .services import (
     generate_occurrences_for_week,
     refresh_overdue_occurrences,
     reschedule_occurrence,
+    persist_closed_week_summaries,
 )
 
 
@@ -743,6 +744,72 @@ class DashboardViewTests(TestCase):
         self.assertContains(response, "Alex")
         self.assertContains(response, "Sam")
         self.assertContains(response, "0%")
+
+
+class HistoryViewTests(TestCase):
+    def setUp(self):
+        self.alex = HouseholdMember.objects.create(name="Alex")
+        self.sam = HouseholdMember.objects.create(name="Sam")
+        self.definition = ChoreDefinition.objects.create(
+            name="Historical chore",
+            category=ChoreDefinition.Category.OTHER,
+            effort_score=3,
+            priority=ChoreDefinition.Priority.MEDIUM,
+            recurrence=ChoreDefinition.Recurrence.ONE_TIME,
+            assignment_type=ChoreDefinition.AssignmentType.UNASSIGNED,
+        )
+
+    def test_closed_week_is_persisted_and_displayed(self):
+        occurrence = ChoreOccurrence.objects.create(
+            definition=self.definition,
+            due_date=date(2026, 8, 27),
+            status=ChoreOccurrence.Status.COMPLETED,
+            chore_name=self.definition.name,
+            category=self.definition.category,
+            effort_score=self.definition.effort_score,
+            priority=self.definition.priority,
+            recurrence=self.definition.recurrence,
+        )
+        ChoreAssignment.objects.create(occurrence=occurrence, member=self.alex)
+        ChoreCompletion.objects.create(
+            occurrence=occurrence,
+            completed_by=self.sam,
+            completed_at=datetime(2026, 8, 27, 12, tzinfo=timezone.utc),
+        )
+
+        with patch("chores.views.date") as mocked_date:
+            mocked_date.today.return_value = date(2026, 9, 4)
+            response = self.client.get("/history/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Aug. 24, 2026")
+        self.assertContains(response, "Historical chore")
+        self.assertContains(response, "completed by Sam")
+        self.assertEqual(WeeklySummary.objects.count(), 2)
+        self.assertEqual(WeeklySummary.objects.get(member=self.alex).planned_effort_points, 3)
+        self.assertEqual(WeeklySummary.objects.get(member=self.sam).actual_effort_points, 3)
+
+    def test_history_reports_empty_state_without_closed_weeks(self):
+        response = self.client.get("/history/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "No closed weeks yet.")
+
+    def test_closed_summary_can_be_rebuilt_without_duplicate_rows(self):
+        ChoreOccurrence.objects.create(
+            definition=self.definition,
+            due_date=date(2026, 8, 27),
+            chore_name=self.definition.name,
+            category=self.definition.category,
+            effort_score=self.definition.effort_score,
+            priority=self.definition.priority,
+            recurrence=self.definition.recurrence,
+        )
+
+        persist_closed_week_summaries(date(2026, 9, 4))
+        persist_closed_week_summaries(date(2026, 9, 5))
+
+        self.assertEqual(WeeklySummary.objects.count(), 2)
 
 
 class PersistenceBoundaryTests(TestCase):

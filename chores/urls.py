@@ -22,4 +22,5 @@ urlpatterns = [
     path("today/add/", views.today_add, name="today_add"),
     path("today/<int:pk>/action/", views.today_action, name="today_action"),
     path("dashboard/", views.dashboard, name="dashboard"),
+    path("history/", views.history, name="history"),
 ]

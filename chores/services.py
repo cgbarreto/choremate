@@ -4,7 +4,7 @@ from datetime import date, timedelta
 from django.db import transaction
 from django.utils import timezone
 
-from .models import ChoreAssignment, ChoreCompletion, ChoreDefinition, ChoreOccurrence, HouseholdMember
+from .models import ChoreAssignment, ChoreCompletion, ChoreDefinition, ChoreOccurrence, HouseholdMember, WeeklySummary
 
 
 def week_start_for(day=None):
@@ -107,6 +107,43 @@ def calculate_workload(occurrences):
         item["planned_percentage"] = _percentage(item["planned_effort_points"], planned_total)
         item["actual_percentage"] = _percentage(item["actual_effort_points"], actual_total)
     return totals
+
+
+def persist_weekly_summary(week_start):
+    """Persist the planned/actual snapshot for one closed Monday-Sunday week."""
+    if week_start.weekday() != 0:
+        raise ValueError("week_start must be a Monday")
+    week_end = week_start + timedelta(days=6)
+    occurrences = ChoreOccurrence.objects.filter(due_date__range=(week_start, week_end)).select_related(
+        "assignment", "completion"
+    )
+    totals = calculate_workload(occurrences)
+    with transaction.atomic():
+        for member_id, values in totals.items():
+            WeeklySummary.objects.update_or_create(
+                week_start=week_start,
+                member_id=member_id,
+                defaults={
+                    "planned_effort_points": values["planned_effort_points"],
+                    "actual_effort_points": values["actual_effort_points"],
+                    "completed_chore_count": values["completed_chore_count"],
+                },
+            )
+    return totals
+
+
+def persist_closed_week_summaries(as_of=None):
+    """Create or refresh summaries for every week before the current week."""
+    as_of = as_of or timezone.localdate()
+    current_week = week_start_for(as_of)
+    week_starts = {
+        week_start_for(occurrence.due_date)
+        for occurrence in ChoreOccurrence.objects.filter(due_date__lt=current_week).only("due_date")
+    }
+    week_starts.update(WeeklySummary.objects.filter(week_start__lt=current_week).values_list("week_start", flat=True))
+    for week_start in sorted(week_starts):
+        persist_weekly_summary(week_start)
+    return sorted(week_starts)
 
 
 def _percentage(value, total):

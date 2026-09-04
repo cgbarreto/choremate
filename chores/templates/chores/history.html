@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>History - Choremate</title>
+</head>
+<body>
+    <main>
+        <h1>History</h1>
+        {% if week_starts %}
+            <form method="get">
+                <label for="history-week">Closed week</label>
+                <select id="history-week" name="week">
+                    {% for week_start in week_starts %}
+                        <option value="{{ week_start|date:'Y-m-d' }}"{% if week_start == selected_start %} selected{% endif %}>{{ week_start }} to {{ week_start|date:'Y-m-d' }}</option>
+                    {% endfor %}
+                </select>
+                <button type="submit">View week</button>
+            </form>
+            <h2>{{ selected_start }} to {{ selected_end }}</h2>
+            <section aria-labelledby="history-workload-heading">
+                <h3 id="history-workload-heading">Planned and actual workload</h3>
+                <table>
+                    <thead><tr><th scope="col">Member</th><th scope="col">Planned effort</th><th scope="col">Planned share</th><th scope="col">Actual effort</th><th scope="col">Actual share</th><th scope="col">Completed chores</th></tr></thead>
+                    <tbody>
+                        {% for member, summary in summary_rows %}
+                            <tr>
+                                <th scope="row">{{ member.name }}</th>
+                                <td>{{ summary.planned_effort_points|default:0 }}</td>
+                                <td>{{ summary.planned_percentage|default:0 }}%</td>
+                                <td>{{ summary.actual_effort_points|default:0 }}</td>
+                                <td>{{ summary.actual_percentage|default:0 }}%</td>
+                                <td>{{ summary.completed_chore_count|default:0 }}</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </section>
+            <section aria-labelledby="completed-heading">
+                <h3 id="completed-heading">Completed chores</h3>
+                {% if completed_occurrences %}<ul>{% for occurrence in completed_occurrences %}<li>{{ occurrence.chore_name }} — completed by {{ occurrence.completion.completed_by.name }} ({{ occurrence.effort_score }} effort)</li>{% endfor %}</ul>{% else %}<p>No chores were completed in this week.</p>{% endif %}
+            </section>
+        {% else %}<p>No closed weeks yet.</p>{% endif %}
+        <p><a href="{% url 'chores:home' %}">Back to Choremate</a></p>
+    </main>
+</body>
+</html>
