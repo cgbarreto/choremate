@@ -4,6 +4,10 @@ Choremate is a local web application for managing shared household chores betwee
 
 The application helps a couple plan weekly responsibilities, track completed work, and compare planned and actual workload using effort points.
 
+## Course
+
+This project is part of the [AI Dev Tools Zoomcamp](https://aishippingblog.com/p/ai-native-development-specifications), a course focused on specification-driven development and AI-assisted software engineering.
+
 ## Stack
 
 - Python
