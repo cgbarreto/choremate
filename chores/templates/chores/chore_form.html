@@ -8,6 +8,7 @@
 </head>
 <body>
     <main>
+        {% include "chores/_nav.html" %}
         <h1>{{ heading }}</h1>
         <form method="post">
             {% csrf_token %}

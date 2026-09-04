@@ -8,6 +8,7 @@
 </head>
 <body>
     <main>
+        {% include "chores/_nav.html" %}
         <h1>Today</h1>
         <p>{{ today }}</p>
         {% if messages %}{% for message in messages %}<p role="status">{{ message }}</p>{% endfor %}{% endif %}

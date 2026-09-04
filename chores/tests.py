@@ -746,6 +746,21 @@ class DashboardViewTests(TestCase):
         self.assertContains(response, "0%")
 
 
+class SharedNavigationTests(TestCase):
+    def setUp(self):
+        HouseholdMember.objects.create(name="Alex")
+        HouseholdMember.objects.create(name="Sam")
+
+    def test_primary_areas_render_the_shared_navigation(self):
+        for path in ("/", "/today/", "/week/", "/library/", "/dashboard/", "/history/", "/settings/"):
+            with self.subTest(path=path):
+                response = self.client.get(path)
+                self.assertEqual(response.status_code, 200)
+                self.assertContains(response, 'aria-label="Main navigation"')
+                self.assertContains(response, "Dashboard")
+                self.assertContains(response, "History")
+
+
 class HistoryViewTests(TestCase):
     def setUp(self):
         self.alex = HouseholdMember.objects.create(name="Alex")
