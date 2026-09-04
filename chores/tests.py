@@ -1,4 +1,5 @@
 from datetime import date, datetime, timezone
+from unittest.mock import patch
 
 from django.db import IntegrityError
 from django.test import TestCase
@@ -399,6 +400,62 @@ class OccurrenceAssignmentTests(TestCase):
 
         self.assertContains(response, "Choose one of the two household members.")
         self.assertFalse(ChoreAssignment.objects.filter(occurrence=self.occurrence).exists())
+
+
+class WeeklyPlanningTests(TestCase):
+    def setUp(self):
+        self.alex = HouseholdMember.objects.create(name="Alex")
+        self.sam = HouseholdMember.objects.create(name="Sam")
+        self.definition = ChoreDefinition.objects.create(
+            name="Weekly clean",
+            category=ChoreDefinition.Category.CLEANING,
+            effort_score=3,
+            priority=ChoreDefinition.Priority.MEDIUM,
+            recurrence=ChoreDefinition.Recurrence.DAILY,
+            assignment_type=ChoreDefinition.AssignmentType.UNASSIGNED,
+        )
+
+    def test_week_view_shows_all_seven_days_and_generates_current_week(self):
+        with patch("chores.views.week_start_for", return_value=date(2026, 9, 7)):
+            response = self.client.get("/week/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.context["days"]), 7)
+        self.assertEqual(ChoreOccurrence.objects.filter(definition=self.definition).count(), 7)
+        self.assertContains(response, "Weekly Planning")
+
+    def test_week_view_adds_one_time_chore_in_current_week(self):
+        with patch("chores.views.week_start_for", return_value=date(2026, 9, 7)):
+            response = self.client.post(
+                "/week/",
+                {
+                    "name": "Buy detergent",
+                    "due_date": "2026-09-11",
+                    "category": ChoreDefinition.Category.SHOPPING,
+                    "effort_score": 2,
+                    "priority": ChoreDefinition.Priority.HIGH,
+                },
+            )
+
+        self.assertRedirects(response, "/week/")
+        self.assertTrue(ChoreOccurrence.objects.filter(chore_name="Buy detergent", due_date=date(2026, 9, 11)).exists())
+
+    def test_one_time_chore_outside_current_week_is_rejected(self):
+        with patch("chores.views.week_start_for", return_value=date(2026, 9, 7)):
+            response = self.client.post(
+                "/week/",
+                {
+                    "name": "Buy detergent",
+                    "due_date": "2026-09-20",
+                    "category": ChoreDefinition.Category.SHOPPING,
+                    "effort_score": 2,
+                    "priority": ChoreDefinition.Priority.HIGH,
+                },
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "current Monday-to-Sunday week")
+        self.assertFalse(ChoreDefinition.objects.filter(name="Buy detergent").exists())
 
 
 class PersistenceBoundaryTests(TestCase):

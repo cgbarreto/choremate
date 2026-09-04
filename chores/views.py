@@ -1,3 +1,5 @@
+from datetime import timedelta
+
 from django.contrib import messages
 from django.db import transaction
 from django.shortcuts import get_object_or_404, redirect, render
@@ -6,10 +8,12 @@ from .forms import (
     ChoreDefinitionForm,
     HouseholdSetupForm,
     MemberRenameForm,
+    OneTimeOccurrenceForm,
     OccurrenceAssignmentForm,
 )
 from .models import ChoreAssignment, ChoreDefinition, ChoreOccurrence, HouseholdMember
 from .catalog import CATALOG, CATALOG_BY_SLUG
+from .services import create_one_time_occurrence, generate_occurrences_for_week, week_start_for
 
 
 def home(request):
@@ -115,13 +119,14 @@ def occurrences(request):
 
 
 def assign_occurrence(request, pk):
+    next_page = "chores:week" if request.POST.get("next") == "week" else "chores:occurrences"
     if request.method != "POST":
-        return redirect("chores:occurrences")
+        return redirect(next_page)
     occurrence = get_object_or_404(ChoreOccurrence, pk=pk)
     form = OccurrenceAssignmentForm(request.POST)
     if not form.is_valid():
         messages.error(request, "Choose one of the two household members.")
-        return redirect("chores:occurrences")
+        return redirect(next_page)
 
     member = form.cleaned_data["member"]
     assignment = getattr(occurrence, "assignment", None)
@@ -129,19 +134,58 @@ def assign_occurrence(request, pk):
     if action == "claim":
         if assignment is not None:
             messages.error(request, "This occurrence is already assigned.")
-            return redirect("chores:occurrences")
+            return redirect(next_page)
         ChoreAssignment.objects.create(occurrence=occurrence, member=member)
         messages.success(request, "Occurrence claimed.")
     elif action == "reassign":
         if assignment is None:
             messages.error(request, "Claim this unassigned occurrence first.")
-            return redirect("chores:occurrences")
+            return redirect(next_page)
         assignment.member = member
         assignment.save(update_fields=["member"])
         messages.success(request, "Occurrence reassigned.")
     else:
         messages.error(request, "That assignment action is not available.")
-    return redirect("chores:occurrences")
+    return redirect(next_page)
+
+
+def week(request):
+    if HouseholdMember.objects.count() != 2:
+        return redirect("chores:setup")
+
+    start = week_start_for()
+    form = OneTimeOccurrenceForm(request.POST or None)
+    if request.method == "POST" and form.is_valid():
+        due_date = form.cleaned_data["due_date"]
+        if not start <= due_date <= start + timedelta(days=6):
+            form.add_error("due_date", "Choose a date in the current Monday-to-Sunday week.")
+        else:
+            definition = ChoreDefinition.objects.create(
+                name=form.cleaned_data["name"],
+                category=form.cleaned_data["category"],
+                effort_score=form.cleaned_data["effort_score"],
+                priority=form.cleaned_data["priority"],
+                recurrence=ChoreDefinition.Recurrence.ONE_TIME,
+                assignment_type=ChoreDefinition.AssignmentType.UNASSIGNED,
+            )
+            create_one_time_occurrence(definition, due_date)
+            messages.success(request, "One-time chore added to the week.")
+            return redirect("chores:week")
+
+    generate_occurrences_for_week(start)
+    days = []
+    for offset in range(7):
+        day = start + timedelta(days=offset)
+        rows = []
+        for occurrence in ChoreOccurrence.objects.filter(due_date=day).select_related("definition"):
+            assignment = getattr(occurrence, "assignment", None)
+            rows.append((occurrence, OccurrenceAssignmentForm(initial={"member": getattr(assignment, "member_id", None)})))
+        days.append((day, rows))
+    return render(
+        request,
+        "chores/week.html",
+        {"week_start": start, "week_end": start + timedelta(days=6), "days": days, "form": form},
+    )
 
 
 def setup(request):

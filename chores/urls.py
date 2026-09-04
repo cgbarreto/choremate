@@ -17,4 +17,5 @@ urlpatterns = [
     path("library/catalog/<slug:slug>/add/", views.catalog_add, name="catalog_add"),
     path("occurrences/", views.occurrences, name="occurrences"),
     path("occurrences/<int:pk>/assign/", views.assign_occurrence, name="assign_occurrence"),
+    path("week/", views.week, name="week"),
 ]

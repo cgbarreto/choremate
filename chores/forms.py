@@ -105,3 +105,17 @@ class OccurrenceAssignmentForm(forms.Form):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields["member"].queryset = HouseholdMember.objects.order_by("id")
+
+
+class OneTimeOccurrenceForm(forms.Form):
+    name = forms.CharField(label="Chore name", max_length=200)
+    due_date = forms.DateField(label="Due date", widget=forms.DateInput(attrs={"type": "date"}))
+    category = forms.ChoiceField(choices=ChoreDefinition.Category.choices)
+    effort_score = forms.IntegerField(min_value=1, max_value=5, label="Effort score")
+    priority = forms.ChoiceField(choices=ChoreDefinition.Priority.choices)
+
+    def clean_name(self):
+        name = self.cleaned_data["name"].strip()
+        if not name:
+            raise forms.ValidationError("A chore name is required.")
+        return name

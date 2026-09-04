@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Weekly Planning - Choremate</title>
+</head>
+<body>
+    <main>
+        <h1>Weekly Planning</h1>
+        <p>{{ week_start }} to {{ week_end }}</p>
+        {% if messages %}{% for message in messages %}<p role="status">{{ message }}</p>{% endfor %}{% endif %}
+        {% for day, rows in days %}
+            <section aria-labelledby="day-{{ day|date:'Y-m-d' }}">
+                <h2 id="day-{{ day|date:'Y-m-d' }}">{{ day|date:'l, F j, Y' }}</h2>
+                {% if rows %}
+                    <ul>
+                        {% for occurrence, assignment_form in rows %}
+                            <li>
+                                <article aria-labelledby="week-occurrence-{{ occurrence.id }}">
+                                    <h3 id="week-occurrence-{{ occurrence.id }}">{{ occurrence.chore_name }}</h3>
+                                    <p>{{ occurrence.priority }} priority · {{ occurrence.effort_score }} effort · Status: {{ occurrence.status }}</p>
+                                    {% if occurrence.assignment %}
+                                        <p>Assigned to: {{ occurrence.assignment.member.name }}</p>
+                                        <form method="post" action="{% url 'chores:assign_occurrence' occurrence.id %}">
+                                            {% csrf_token %}{{ assignment_form.member.label_tag }} {{ assignment_form.member }}
+                                            <input type="hidden" name="action" value="reassign"><input type="hidden" name="next" value="week">
+                                            <button type="submit">Reassign</button>
+                                        </form>
+                                    {% else %}
+                                        <p>Assigned to: Unassigned</p>
+                                        <form method="post" action="{% url 'chores:assign_occurrence' occurrence.id %}">
+                                            {% csrf_token %}{{ assignment_form.member.label_tag }} {{ assignment_form.member }}
+                                            <input type="hidden" name="action" value="claim"><input type="hidden" name="next" value="week">
+                                            <button type="submit">Claim</button>
+                                        </form>
+                                    {% endif %}
+                                </article>
+                            </li>
+                        {% endfor %}
+                    </ul>
+                {% else %}<p>No chores scheduled.</p>{% endif %}
+            </section>
+        {% endfor %}
+        <section aria-labelledby="add-one-time-heading">
+            <h2 id="add-one-time-heading">Add one-time chore</h2>
+            <form method="post">
+                {% csrf_token %}{{ form.non_field_errors }}
+                {% for field in form %}<p>{{ field.label_tag }} {{ field }} {{ field.errors }}</p>{% endfor %}
+                <button type="submit">Add to week</button>
+            </form>
+        </section>
+        <p><a href="{% url 'chores:home' %}">Back to Choremate</a></p>
+    </main>
+</body>
+</html>

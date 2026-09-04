@@ -6,6 +6,11 @@ from django.db import transaction
 from .models import ChoreAssignment, ChoreDefinition, ChoreOccurrence, HouseholdMember
 
 
+def week_start_for(day=None):
+    day = day or date.today()
+    return day - timedelta(days=day.weekday())
+
+
 def generate_occurrences_for_week(week_start):
     """Create active recurring occurrences in the Monday-to-Sunday week."""
     if week_start.weekday() != 0:
