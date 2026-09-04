@@ -80,6 +80,39 @@ def cancel_occurrence(occurrence):
     return occurrence
 
 
+def calculate_workload(occurrences):
+    """Return planned and actual effort totals for the household members."""
+    totals = {
+        member.id: {
+            "planned_effort_points": 0,
+            "actual_effort_points": 0,
+            "completed_chore_count": 0,
+        }
+        for member in HouseholdMember.objects.order_by("id")
+    }
+    for occurrence in occurrences:
+        assignment = getattr(occurrence, "assignment", None)
+        if assignment is not None and assignment.member_id in totals:
+            totals[assignment.member_id]["planned_effort_points"] += occurrence.effort_score
+
+        completion = getattr(occurrence, "completion", None)
+        if occurrence.status == ChoreOccurrence.Status.COMPLETED and completion is not None:
+            if completion.completed_by_id in totals:
+                totals[completion.completed_by_id]["actual_effort_points"] += occurrence.effort_score
+                totals[completion.completed_by_id]["completed_chore_count"] += 1
+
+    planned_total = sum(item["planned_effort_points"] for item in totals.values())
+    actual_total = sum(item["actual_effort_points"] for item in totals.values())
+    for item in totals.values():
+        item["planned_percentage"] = _percentage(item["planned_effort_points"], planned_total)
+        item["actual_percentage"] = _percentage(item["actual_effort_points"], actual_total)
+    return totals
+
+
+def _percentage(value, total):
+    return round(value * 100 / total, 2) if total else 0
+
+
 def _recurring_dates(definition, week_start, week_end):
     if definition.recurrence == ChoreDefinition.Recurrence.DAILY:
         return [week_start + timedelta(days=offset) for offset in range(7)]

@@ -16,6 +16,7 @@ from .services import (
     cancel_occurrence,
     complete_occurrence,
     create_one_time_occurrence,
+    calculate_workload,
     generate_occurrences_for_week,
     refresh_overdue_occurrences,
     reschedule_occurrence,
@@ -529,6 +530,60 @@ class OccurrenceLifecycleTests(TestCase):
         complete_occurrence(other, self.member)
         with self.assertRaises(ValueError):
             cancel_occurrence(other)
+
+
+class WorkloadCalculationTests(TestCase):
+    def setUp(self):
+        self.alex = HouseholdMember.objects.create(name="Alex")
+        self.sam = HouseholdMember.objects.create(name="Sam")
+        self.definition = ChoreDefinition.objects.create(
+            name="Workload chore",
+            category=ChoreDefinition.Category.OTHER,
+            effort_score=4,
+            priority=ChoreDefinition.Priority.MEDIUM,
+            recurrence=ChoreDefinition.Recurrence.ONE_TIME,
+            assignment_type=ChoreDefinition.AssignmentType.UNASSIGNED,
+        )
+
+    def make_occurrence(self, due_date, status=ChoreOccurrence.Status.PENDING):
+        return ChoreOccurrence.objects.create(
+            definition=self.definition,
+            due_date=due_date,
+            status=status,
+            chore_name=self.definition.name,
+            category=self.definition.category,
+            effort_score=self.definition.effort_score,
+            priority=self.definition.priority,
+            recurrence=self.definition.recurrence,
+        )
+
+    def test_planned_and_actual_totals_use_their_respective_members(self):
+        assigned_to_alex = self.make_occurrence(date(2026, 9, 1))
+        ChoreAssignment.objects.create(occurrence=assigned_to_alex, member=self.alex)
+        complete_occurrence(assigned_to_alex, self.sam, datetime(2026, 9, 1, tzinfo=timezone.utc))
+
+        assigned_to_sam = self.make_occurrence(date(2026, 9, 2))
+        ChoreAssignment.objects.create(occurrence=assigned_to_sam, member=self.sam)
+
+        unassigned = self.make_occurrence(date(2026, 9, 3))
+        totals = calculate_workload(ChoreOccurrence.objects.all())
+
+        self.assertEqual(totals[self.alex.id]["planned_effort_points"], 4)
+        self.assertEqual(totals[self.sam.id]["planned_effort_points"], 4)
+        self.assertEqual(totals[self.alex.id]["actual_effort_points"], 0)
+        self.assertEqual(totals[self.sam.id]["actual_effort_points"], 4)
+        self.assertEqual(totals[self.sam.id]["completed_chore_count"], 1)
+        self.assertEqual(totals[self.alex.id]["actual_percentage"], 0)
+        self.assertEqual(totals[self.sam.id]["actual_percentage"], 100)
+        self.assertEqual(totals[self.alex.id]["planned_percentage"], 50)
+        self.assertEqual(totals[self.sam.id]["planned_percentage"], 50)
+        self.assertIsNone(getattr(unassigned, "assignment", None))
+
+    def test_zero_workload_has_zero_percentages(self):
+        totals = calculate_workload([])
+
+        self.assertEqual(totals[self.alex.id]["planned_percentage"], 0)
+        self.assertEqual(totals[self.sam.id]["actual_percentage"], 0)
 
 
 class PersistenceBoundaryTests(TestCase):
