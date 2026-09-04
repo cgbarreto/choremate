@@ -3,6 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    {% load static %}<link rel="stylesheet" href="{% static 'chores/app.css' %}">
     <title>Dashboard - Choremate</title>
 </head>
 <body>
@@ -28,11 +29,11 @@
                     {% for member, totals in rows %}
                         <tr>
                             <th scope="row">{{ member.name }}</th>
-                            <td>{{ totals.planned_effort_points }}</td>
-                            <td>{{ totals.planned_percentage }}%</td>
-                            <td>{{ totals.actual_effort_points }}</td>
-                            <td>{{ totals.actual_percentage }}%</td>
-                            <td>{{ totals.completed_chore_count }}</td>
+                            <td data-label="Planned effort">{{ totals.planned_effort_points }}</td>
+                            <td data-label="Planned share">{{ totals.planned_percentage }}%</td>
+                            <td data-label="Completed effort">{{ totals.actual_effort_points }}</td>
+                            <td data-label="Actual share">{{ totals.actual_percentage }}%</td>
+                            <td data-label="Chores completed">{{ totals.completed_chore_count }}</td>
                         </tr>
                     {% endfor %}
                 </tbody>

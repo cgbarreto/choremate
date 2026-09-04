@@ -3,6 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    {% load static %}<link rel="stylesheet" href="{% static 'chores/app.css' %}">
     <title>History - Choremate</title>
 </head>
 <body>
@@ -27,11 +28,11 @@
                         {% for member, summary in summary_rows %}
                             <tr>
                                 <th scope="row">{{ member.name }}</th>
-                                <td>{{ summary.planned_effort_points|default:0 }}</td>
-                                <td>{{ summary.planned_percentage|default:0 }}%</td>
-                                <td>{{ summary.actual_effort_points|default:0 }}</td>
-                                <td>{{ summary.actual_percentage|default:0 }}%</td>
-                                <td>{{ summary.completed_chore_count|default:0 }}</td>
+                                <td data-label="Planned effort">{{ summary.planned_effort_points|default:0 }}</td>
+                                <td data-label="Planned share">{{ summary.planned_percentage|default:0 }}%</td>
+                                <td data-label="Actual effort">{{ summary.actual_effort_points|default:0 }}</td>
+                                <td data-label="Actual share">{{ summary.actual_percentage|default:0 }}%</td>
+                                <td data-label="Completed chores">{{ summary.completed_chore_count|default:0 }}</td>
                             </tr>
                         {% endfor %}
                     </tbody>

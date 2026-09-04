@@ -1,0 +1,47 @@
+:root {
+    color-scheme: light;
+    font-family: Inter, ui-sans-serif, system-ui, -apple-system, sans-serif;
+    color: #253044;
+    background: #f5f7fb;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; line-height: 1.5; }
+main { width: min(1120px, calc(100% - 2rem)); margin: 0 auto; padding: 2rem 0 4rem; }
+h1 { color: #172554; font-size: clamp(2rem, 5vw, 3rem); margin: 0 0 .35rem; }
+h2, h3 { color: #1e3a5f; }
+nav { display: flex; flex-wrap: wrap; gap: .55rem; margin: 1.5rem 0 2rem; }
+nav a, a { color: #145da0; }
+nav a, button { border-radius: .6rem; }
+nav a { background: #e1efff; padding: .55rem .8rem; text-decoration: none; font-weight: 650; }
+section, article, table { background: #fff; border: 1px solid #dbe3ef; border-radius: .85rem; }
+section, article { padding: 1rem; margin: 1rem 0; }
+ul { list-style: none; padding: 0; }
+li { margin: .75rem 0; }
+article { box-shadow: 0 4px 16px rgb(30 58 95 / 6%); }
+form { margin: .8rem 0; }
+label { font-weight: 650; }
+input, select, button { font: inherit; min-height: 2.6rem; }
+input, select { width: 100%; max-width: 26rem; border: 1px solid #aebbd0; border-radius: .45rem; padding: .45rem .6rem; background: #fff; }
+button { border: 0; background: #145da0; color: #fff; cursor: pointer; padding: .55rem .85rem; font-weight: 700; }
+button:hover, button:focus-visible { background: #0b477d; }
+[role="status"] { background: #e8f7ee; border-left: 4px solid #20844b; padding: .7rem; }
+table { width: 100%; border-collapse: separate; border-spacing: 0; overflow: hidden; }
+th, td { text-align: left; padding: .75rem; border-bottom: 1px solid #e6ebf2; }
+thead { background: #edf4fc; }
+tr:last-child th, tr:last-child td { border-bottom: 0; }
+
+@media (max-width: 680px) {
+    main { width: min(100% - 1rem, 34rem); padding-top: 1rem; }
+    nav { gap: .4rem; margin: 1rem 0 1.25rem; }
+    nav a { flex: 1 1 45%; text-align: center; }
+    section, article { padding: .8rem; }
+    table, tbody, tr, td, th { display: block; width: 100%; }
+    thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+    tbody tr { padding: .7rem; border-bottom: 1px solid #dbe3ef; }
+    tbody tr:last-child { border-bottom: 0; }
+    tbody th { padding: .15rem 0 .45rem; font-size: 1.1rem; }
+    tbody td { display: flex; justify-content: space-between; gap: 1rem; padding: .35rem 0; border: 0; }
+    tbody td::before { content: attr(data-label); font-weight: 650; color: #52627a; }
+    button { width: 100%; margin-top: .35rem; }
+}
