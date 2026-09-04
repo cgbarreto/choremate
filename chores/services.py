@@ -2,8 +2,9 @@ import calendar
 from datetime import date, timedelta
 
 from django.db import transaction
+from django.utils import timezone
 
-from .models import ChoreAssignment, ChoreDefinition, ChoreOccurrence, HouseholdMember
+from .models import ChoreAssignment, ChoreCompletion, ChoreDefinition, ChoreOccurrence, HouseholdMember
 
 
 def week_start_for(day=None):
@@ -38,6 +39,45 @@ def create_one_time_occurrence(definition, due_date):
         if created:
             _create_assignment_if_needed(occurrence, definition)
         return occurrence
+
+
+def refresh_overdue_occurrences(as_of=None):
+    as_of = as_of or timezone.localdate()
+    return ChoreOccurrence.objects.filter(
+        status=ChoreOccurrence.Status.PENDING,
+        due_date__lt=as_of,
+    ).update(status=ChoreOccurrence.Status.OVERDUE)
+
+
+def complete_occurrence(occurrence, member, completed_at=None):
+    if occurrence.status == ChoreOccurrence.Status.CANCELLED:
+        raise ValueError("A cancelled occurrence cannot be completed")
+    completed_at = completed_at or timezone.now()
+    with transaction.atomic():
+        completion, _ = ChoreCompletion.objects.update_or_create(
+            occurrence=occurrence,
+            defaults={"completed_by": member, "completed_at": completed_at},
+        )
+        occurrence.status = ChoreOccurrence.Status.COMPLETED
+        occurrence.save(update_fields=["status"])
+    return completion
+
+
+def reschedule_occurrence(occurrence, due_date):
+    if occurrence.status in {ChoreOccurrence.Status.COMPLETED, ChoreOccurrence.Status.CANCELLED}:
+        raise ValueError("Only pending or overdue occurrences can be rescheduled")
+    occurrence.due_date = due_date
+    occurrence.status = ChoreOccurrence.Status.PENDING
+    occurrence.save(update_fields=["due_date", "status"])
+    return occurrence
+
+
+def cancel_occurrence(occurrence):
+    if occurrence.status == ChoreOccurrence.Status.COMPLETED:
+        raise ValueError("A completed occurrence cannot be cancelled")
+    occurrence.status = ChoreOccurrence.Status.CANCELLED
+    occurrence.save(update_fields=["status"])
+    return occurrence
 
 
 def _recurring_dates(definition, week_start, week_end):

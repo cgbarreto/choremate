@@ -12,7 +12,14 @@ from .models import (
     HouseholdMember,
     WeeklySummary,
 )
-from .services import create_one_time_occurrence, generate_occurrences_for_week
+from .services import (
+    cancel_occurrence,
+    complete_occurrence,
+    create_one_time_occurrence,
+    generate_occurrences_for_week,
+    refresh_overdue_occurrences,
+    reschedule_occurrence,
+)
 
 
 class HomeViewTests(TestCase):
@@ -456,6 +463,72 @@ class WeeklyPlanningTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "current Monday-to-Sunday week")
         self.assertFalse(ChoreDefinition.objects.filter(name="Buy detergent").exists())
+
+
+class OccurrenceLifecycleTests(TestCase):
+    def setUp(self):
+        self.member = HouseholdMember.objects.create(name="Alex")
+        self.other_member = HouseholdMember.objects.create(name="Sam")
+        definition = ChoreDefinition.objects.create(
+            name="Lifecycle chore",
+            category=ChoreDefinition.Category.OTHER,
+            effort_score=2,
+            priority=ChoreDefinition.Priority.MEDIUM,
+            recurrence=ChoreDefinition.Recurrence.ONE_TIME,
+            assignment_type=ChoreDefinition.AssignmentType.UNASSIGNED,
+        )
+        self.occurrence = ChoreOccurrence.objects.create(
+            definition=definition,
+            due_date=date(2026, 9, 1),
+            chore_name=definition.name,
+            category=definition.category,
+            effort_score=definition.effort_score,
+            priority=definition.priority,
+            recurrence=definition.recurrence,
+        )
+
+    def test_pending_occurrence_becomes_overdue_after_due_date(self):
+        self.assertEqual(refresh_overdue_occurrences(date(2026, 9, 2)), 1)
+        self.occurrence.refresh_from_db()
+        self.assertEqual(self.occurrence.status, ChoreOccurrence.Status.OVERDUE)
+
+    def test_overdue_occurrence_can_be_completed_by_any_member(self):
+        refresh_overdue_occurrences(date(2026, 9, 2))
+
+        complete_occurrence(self.occurrence, self.other_member, datetime(2026, 9, 2, tzinfo=timezone.utc))
+
+        self.occurrence.refresh_from_db()
+        self.assertEqual(self.occurrence.status, ChoreOccurrence.Status.COMPLETED)
+        self.assertEqual(self.occurrence.completion.completed_by, self.other_member)
+
+    def test_overdue_occurrence_can_be_rescheduled_or_cancelled(self):
+        refresh_overdue_occurrences(date(2026, 9, 2))
+        reschedule_occurrence(self.occurrence, date(2026, 9, 5))
+        self.occurrence.refresh_from_db()
+        self.assertEqual(self.occurrence.status, ChoreOccurrence.Status.PENDING)
+        self.assertEqual(self.occurrence.due_date, date(2026, 9, 5))
+
+        cancel_occurrence(self.occurrence)
+        self.occurrence.refresh_from_db()
+        self.assertEqual(self.occurrence.status, ChoreOccurrence.Status.CANCELLED)
+
+    def test_cancelled_and_completed_occurrences_reject_invalid_transitions(self):
+        cancel_occurrence(self.occurrence)
+        with self.assertRaises(ValueError):
+            complete_occurrence(self.occurrence, self.member)
+
+        other = ChoreOccurrence.objects.create(
+            definition=self.occurrence.definition,
+            due_date=date(2026, 9, 3),
+            chore_name=self.occurrence.chore_name,
+            category=self.occurrence.category,
+            effort_score=self.occurrence.effort_score,
+            priority=self.occurrence.priority,
+            recurrence=self.occurrence.recurrence,
+        )
+        complete_occurrence(other, self.member)
+        with self.assertRaises(ValueError):
+            cancel_occurrence(other)
 
 
 class PersistenceBoundaryTests(TestCase):
