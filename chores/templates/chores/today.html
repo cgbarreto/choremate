@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Today - Choremate</title>
+</head>
+<body>
+    <main>
+        <h1>Today</h1>
+        <p>{{ today }}</p>
+        {% if messages %}{% for message in messages %}<p role="status">{{ message }}</p>{% endfor %}{% endif %}
+        {% if rows %}
+            <ul>
+                {% for occurrence, assignment_form, completion_form, reschedule_form in rows %}
+                    <li>
+                        <article aria-labelledby="today-occurrence-{{ occurrence.id }}">
+                            <h2 id="today-occurrence-{{ occurrence.id }}">{{ occurrence.chore_name }}</h2>
+                            <p>Due: {{ occurrence.due_date }} · {{ occurrence.priority }} priority · {{ occurrence.effort_score }} effort · Status: {{ occurrence.status }}</p>
+                            {% if occurrence.assignment %}<p>Assigned to: {{ occurrence.assignment.member.name }}</p>{% else %}<p>Assigned to: Unassigned</p>{% endif %}
+                            {% if not occurrence.assignment %}
+                                <p><a href="{% url 'chores:occurrences' %}">Claim this chore</a></p>
+                            {% endif %}
+                            {% if occurrence.status != 'completed' and occurrence.status != 'cancelled' %}
+                                <form method="post" action="{% url 'chores:today_action' occurrence.id %}">
+                                    {% csrf_token %}{{ completion_form.member.label_tag }} {{ completion_form.member }}
+                                    <input type="hidden" name="action" value="complete"><button type="submit">Complete</button>
+                                </form>
+                                <form method="post" action="{% url 'chores:today_action' occurrence.id %}">
+                                    {% csrf_token %}{{ reschedule_form.due_date.label_tag }} {{ reschedule_form.due_date }}
+                                    <input type="hidden" name="action" value="reschedule"><button type="submit">Reschedule</button>
+                                </form>
+                                <form method="post" action="{% url 'chores:today_action' occurrence.id %}">
+                                    {% csrf_token %}<input type="hidden" name="action" value="cancel"><button type="submit">Cancel</button>
+                                </form>
+                            {% endif %}
+                        </article>
+                    </li>
+                {% endfor %}
+            </ul>
+        {% else %}<p>No chores due today or overdue.</p>{% endif %}
+        <section aria-labelledby="today-add-heading">
+            <h2 id="today-add-heading">Add one-time chore</h2>
+            <form method="post" action="{% url 'chores:today_add' %}">
+                {% csrf_token %}{% for field in form %}<p>{{ field.label_tag }} {{ field }} {{ field.errors }}</p>{% endfor %}
+                <button type="submit">Add for today</button>
+            </form>
+        </section>
+        <p><a href="{% url 'chores:home' %}">Back to Choremate</a></p>
+    </main>
+</body>
+</html>

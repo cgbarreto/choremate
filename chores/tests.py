@@ -586,6 +586,67 @@ class WorkloadCalculationTests(TestCase):
         self.assertEqual(totals[self.sam.id]["actual_percentage"], 0)
 
 
+class TodayViewTests(TestCase):
+    def setUp(self):
+        self.alex = HouseholdMember.objects.create(name="Alex")
+        self.sam = HouseholdMember.objects.create(name="Sam")
+        self.definition = ChoreDefinition.objects.create(
+            name="Today chore",
+            category=ChoreDefinition.Category.OTHER,
+            effort_score=2,
+            priority=ChoreDefinition.Priority.HIGH,
+            recurrence=ChoreDefinition.Recurrence.ONE_TIME,
+            assignment_type=ChoreDefinition.AssignmentType.UNASSIGNED,
+        )
+
+    def make_occurrence(self, due_date, status=ChoreOccurrence.Status.PENDING):
+        return ChoreOccurrence.objects.create(
+            definition=self.definition, due_date=due_date, status=status,
+            chore_name=self.definition.name, category=self.definition.category,
+            effort_score=self.definition.effort_score, priority=self.definition.priority,
+            recurrence=self.definition.recurrence,
+        )
+
+    def test_today_shows_due_and_overdue_work(self):
+        self.make_occurrence(date(2026, 9, 4))
+        self.make_occurrence(date(2026, 9, 1))
+
+        with patch("chores.views.date") as mocked_date:
+            mocked_date.today.return_value = date(2026, 9, 4)
+            response = self.client.get("/today/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Today chore")
+        self.assertEqual(ChoreOccurrence.objects.filter(status=ChoreOccurrence.Status.OVERDUE).count(), 1)
+
+    def test_today_can_complete_and_cancel_an_occurrence(self):
+        occurrence = self.make_occurrence(date(2026, 9, 4))
+
+        response = self.client.post(
+            f"/today/{occurrence.id}/action/",
+            {"action": "complete", "member": self.sam.id},
+        )
+        self.assertRedirects(response, "/today/")
+        occurrence.refresh_from_db()
+        self.assertEqual(occurrence.status, ChoreOccurrence.Status.COMPLETED)
+
+        other = self.make_occurrence(date(2026, 9, 5))
+        self.client.post(f"/today/{other.id}/action/", {"action": "cancel"})
+        other.refresh_from_db()
+        self.assertEqual(other.status, ChoreOccurrence.Status.CANCELLED)
+
+    def test_today_adds_a_one_time_chore_for_today(self):
+        with patch("chores.views.date") as mocked_date:
+            mocked_date.today.return_value = date(2026, 9, 4)
+            response = self.client.post(
+                "/today/add/",
+                {"name": "Buy milk", "category": "shopping", "effort_score": 1, "priority": "high"},
+            )
+
+        self.assertRedirects(response, "/today/")
+        self.assertTrue(ChoreOccurrence.objects.filter(chore_name="Buy milk", due_date=date(2026, 9, 4)).exists())
+
+
 class PersistenceBoundaryTests(TestCase):
     def setUp(self):
         self.member = HouseholdMember.objects.create(name="Alex")

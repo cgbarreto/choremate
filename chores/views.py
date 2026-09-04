@@ -1,7 +1,8 @@
-from datetime import timedelta
+from datetime import date, timedelta
 
 from django.contrib import messages
 from django.db import transaction
+from django.db.models import Q
 from django.shortcuts import get_object_or_404, redirect, render
 
 from .forms import (
@@ -10,10 +11,21 @@ from .forms import (
     MemberRenameForm,
     OneTimeOccurrenceForm,
     OccurrenceAssignmentForm,
+    CompletionForm,
+    RescheduleForm,
+    TodayOneTimeForm,
 )
 from .models import ChoreAssignment, ChoreDefinition, ChoreOccurrence, HouseholdMember
 from .catalog import CATALOG, CATALOG_BY_SLUG
-from .services import create_one_time_occurrence, generate_occurrences_for_week, week_start_for
+from .services import (
+    cancel_occurrence,
+    complete_occurrence,
+    create_one_time_occurrence,
+    generate_occurrences_for_week,
+    refresh_overdue_occurrences,
+    reschedule_occurrence,
+    week_start_for,
+)
 
 
 def home(request):
@@ -186,6 +198,69 @@ def week(request):
         "chores/week.html",
         {"week_start": start, "week_end": start + timedelta(days=6), "days": days, "form": form},
     )
+
+
+def today(request):
+    if HouseholdMember.objects.count() != 2:
+        return redirect("chores:setup")
+    current_day = date.today()
+    refresh_overdue_occurrences(current_day)
+    occurrences = ChoreOccurrence.objects.filter(
+        Q(due_date=current_day) | Q(status=ChoreOccurrence.Status.OVERDUE)
+    ).select_related("definition").order_by("status", "due_date", "id")
+    rows = []
+    for occurrence in occurrences:
+        assignment = getattr(occurrence, "assignment", None)
+        rows.append(
+            (occurrence, OccurrenceAssignmentForm(initial={"member": getattr(assignment, "member_id", None)}), CompletionForm(), RescheduleForm(initial={"due_date": occurrence.due_date}))
+        )
+    return render(request, "chores/today.html", {"rows": rows, "form": TodayOneTimeForm(), "today": current_day})
+
+
+def today_action(request, pk):
+    if request.method != "POST":
+        return redirect("chores:today")
+    occurrence = get_object_or_404(ChoreOccurrence, pk=pk)
+    action = request.POST.get("action")
+    if action == "complete":
+        form = CompletionForm(request.POST)
+        if form.is_valid():
+            complete_occurrence(occurrence, form.cleaned_data["member"])
+            messages.success(request, "Chore completed.")
+        else:
+            messages.error(request, "Choose the member who completed this chore.")
+    elif action == "reschedule":
+        form = RescheduleForm(request.POST)
+        if form.is_valid():
+            try:
+                reschedule_occurrence(occurrence, form.cleaned_data["due_date"])
+                messages.success(request, "Chore rescheduled.")
+            except ValueError as error:
+                messages.error(request, str(error))
+        else:
+            messages.error(request, "Choose a valid new due date.")
+    elif action == "cancel":
+        try:
+            cancel_occurrence(occurrence)
+            messages.success(request, "Chore cancelled.")
+        except ValueError as error:
+            messages.error(request, str(error))
+    return redirect("chores:today")
+
+
+def today_add(request):
+    if request.method != "POST":
+        return redirect("chores:today")
+    form = TodayOneTimeForm(request.POST)
+    if form.is_valid():
+        definition = ChoreDefinition.objects.create(
+            name=form.cleaned_data["name"], category=form.cleaned_data["category"], effort_score=form.cleaned_data["effort_score"], priority=form.cleaned_data["priority"], recurrence=ChoreDefinition.Recurrence.ONE_TIME, assignment_type=ChoreDefinition.AssignmentType.UNASSIGNED,
+        )
+        create_one_time_occurrence(definition, date.today())
+        messages.success(request, "One-time chore added for today.")
+    else:
+        messages.error(request, "Enter a valid one-time chore.")
+    return redirect("chores:today")
 
 
 def setup(request):

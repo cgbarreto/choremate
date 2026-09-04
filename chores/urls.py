@@ -18,4 +18,7 @@ urlpatterns = [
     path("occurrences/", views.occurrences, name="occurrences"),
     path("occurrences/<int:pk>/assign/", views.assign_occurrence, name="assign_occurrence"),
     path("week/", views.week, name="week"),
+    path("today/", views.today, name="today"),
+    path("today/add/", views.today_add, name="today_add"),
+    path("today/<int:pk>/action/", views.today_action, name="today_action"),
 ]
