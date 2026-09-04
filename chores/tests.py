@@ -11,6 +11,7 @@ from .models import (
     HouseholdMember,
     WeeklySummary,
 )
+from .services import create_one_time_occurrence, generate_occurrences_for_week
 
 
 class HomeViewTests(TestCase):
@@ -237,6 +238,100 @@ class ChoreCatalogTests(TestCase):
 
         self.assertContains(response, "could not be found")
         self.assertEqual(ChoreDefinition.objects.count(), 0)
+
+
+class RecurrenceGenerationTests(TestCase):
+    def setUp(self):
+        self.alex = HouseholdMember.objects.create(name="Alex")
+        self.sam = HouseholdMember.objects.create(name="Sam")
+
+    def create_definition(self, **overrides):
+        data = {
+            "name": "Recurring chore",
+            "category": ChoreDefinition.Category.CLEANING,
+            "effort_score": 3,
+            "priority": ChoreDefinition.Priority.MEDIUM,
+            "recurrence": ChoreDefinition.Recurrence.DAILY,
+            "assignment_type": ChoreDefinition.AssignmentType.UNASSIGNED,
+        }
+        data.update(overrides)
+        return ChoreDefinition.objects.create(**data)
+
+    def set_creation_date(self, definition, creation_date):
+        ChoreDefinition.objects.filter(pk=definition.pk).update(
+            created_at=datetime.combine(creation_date, datetime.min.time(), tzinfo=timezone.utc),
+        )
+        definition.refresh_from_db()
+
+    def test_daily_generation_creates_seven_snapshot_occurrences(self):
+        definition = self.create_definition()
+
+        occurrences = generate_occurrences_for_week(date(2026, 9, 7))
+
+        self.assertEqual(len(occurrences), 7)
+        self.assertEqual(
+            list(ChoreOccurrence.objects.values_list("due_date", flat=True)),
+            [date(2026, 9, day) for day in range(7, 14)],
+        )
+        self.assertEqual(occurrences[0].recurrence, definition.recurrence)
+        self.assertEqual(occurrences[0].effort_score, definition.effort_score)
+
+    def test_weekly_generation_uses_definition_weekday_and_is_idempotent(self):
+        definition = self.create_definition(recurrence=ChoreDefinition.Recurrence.WEEKLY)
+        self.set_creation_date(definition, date(2026, 9, 9))
+
+        first_run = generate_occurrences_for_week(date(2026, 9, 7))
+        second_run = generate_occurrences_for_week(date(2026, 9, 7))
+
+        self.assertEqual([occurrence.due_date for occurrence in first_run], [date(2026, 9, 9)])
+        self.assertEqual([occurrence.pk for occurrence in first_run], [occurrence.pk for occurrence in second_run])
+        self.assertEqual(ChoreOccurrence.objects.count(), 1)
+
+    def test_monthly_generation_uses_anchor_day_clamped_to_month_end(self):
+        definition = self.create_definition(recurrence=ChoreDefinition.Recurrence.MONTHLY)
+        self.set_creation_date(definition, date(2026, 1, 31))
+
+        occurrences = generate_occurrences_for_week(date(2026, 9, 28))
+
+        self.assertEqual([occurrence.due_date for occurrence in occurrences], [date(2026, 9, 30)])
+
+    def test_inactive_definitions_are_not_generated(self):
+        definition = self.create_definition(is_active=False)
+
+        self.assertEqual(generate_occurrences_for_week(date(2026, 9, 7)), [])
+        self.assertFalse(ChoreOccurrence.objects.filter(definition=definition).exists())
+
+    def test_one_time_occurrence_can_be_created_manually(self):
+        definition = self.create_definition(recurrence=ChoreDefinition.Recurrence.ONE_TIME)
+
+        occurrence = create_one_time_occurrence(definition, date(2026, 9, 12))
+
+        self.assertEqual(occurrence.due_date, date(2026, 9, 12))
+        self.assertEqual(occurrence.recurrence, ChoreDefinition.Recurrence.ONE_TIME)
+        self.assertEqual(create_one_time_occurrence(definition, occurrence.due_date).pk, occurrence.pk)
+
+    def test_fixed_and_alternating_assignments_are_generated(self):
+        fixed = self.create_definition(
+            name="Fixed chore",
+            recurrence=ChoreDefinition.Recurrence.WEEKLY,
+            assignment_type=ChoreDefinition.AssignmentType.FIXED,
+            fixed_member=self.alex,
+        )
+        alternating = self.create_definition(
+            name="Alternating chore",
+            recurrence=ChoreDefinition.Recurrence.WEEKLY,
+            assignment_type=ChoreDefinition.AssignmentType.ALTERNATING,
+        )
+        self.set_creation_date(alternating, date(2026, 9, 9))
+
+        generate_occurrences_for_week(date(2026, 9, 7))
+        generate_occurrences_for_week(date(2026, 9, 14))
+
+        self.assertEqual(fixed.occurrences.order_by("due_date").first().assignment.member, self.alex)
+        alternating_assignments = list(
+            alternating.occurrences.order_by("due_date").values_list("assignment__member", flat=True)
+        )
+        self.assertEqual(alternating_assignments, [self.alex.id, self.sam.id])
 
 
 class PersistenceBoundaryTests(TestCase):

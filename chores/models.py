@@ -84,6 +84,12 @@ class ChoreOccurrence(models.Model):
     category = models.CharField(max_length=20, choices=ChoreDefinition.Category.choices)
     effort_score = models.PositiveSmallIntegerField()
     priority = models.CharField(max_length=10, choices=ChoreDefinition.Priority.choices)
+    recurrence = models.CharField(
+        max_length=10,
+        choices=ChoreDefinition.Recurrence.choices,
+        blank=True,
+        null=True,
+    )
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
