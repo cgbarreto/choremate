@@ -94,3 +94,14 @@ class ChoreDefinitionForm(forms.ModelForm):
         if assignment_type != ChoreDefinition.AssignmentType.FIXED:
             cleaned_data["fixed_member"] = None
         return cleaned_data
+
+
+class OccurrenceAssignmentForm(forms.Form):
+    member = forms.ModelChoiceField(
+        label="Member",
+        queryset=HouseholdMember.objects.none(),
+    )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["member"].queryset = HouseholdMember.objects.order_by("id")

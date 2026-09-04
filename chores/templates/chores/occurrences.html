@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Occurrences - Choremate</title>
+</head>
+<body>
+    <main>
+        <h1>Occurrences</h1>
+        {% if messages %}
+            {% for message in messages %}
+                <p role="status">{{ message }}</p>
+            {% endfor %}
+        {% endif %}
+        {% if occurrence_forms %}
+            <ul>
+                {% for occurrence, form in occurrence_forms %}
+                    <li>
+                        <article aria-labelledby="occurrence-{{ occurrence.id }}-name">
+                            <h2 id="occurrence-{{ occurrence.id }}-name">{{ occurrence.chore_name }}</h2>
+                            <p>Due: {{ occurrence.due_date }} · Status: {{ occurrence.status }}</p>
+                            {% if occurrence.assignment %}
+                                <p>Assigned to: {{ occurrence.assignment.member.name }}</p>
+                                <form method="post" action="{% url 'chores:assign_occurrence' occurrence.id %}">
+                                    {% csrf_token %}
+                                    {{ form.member.label_tag }} {{ form.member }}
+                                    <input type="hidden" name="action" value="reassign">
+                                    <button type="submit">Reassign</button>
+                                </form>
+                            {% else %}
+                                <p>Assigned to: Unassigned</p>
+                                <form method="post" action="{% url 'chores:assign_occurrence' occurrence.id %}">
+                                    {% csrf_token %}
+                                    {{ form.member.label_tag }} {{ form.member }}
+                                    <input type="hidden" name="action" value="claim">
+                                    <button type="submit">Claim</button>
+                                </form>
+                            {% endif %}
+                        </article>
+                    </li>
+                {% endfor %}
+            </ul>
+        {% else %}
+            <p>No occurrences yet.</p>
+        {% endif %}
+        <p><a href="{% url 'chores:home' %}">Back to Choremate</a></p>
+    </main>
+</body>
+</html>

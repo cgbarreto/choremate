@@ -2,8 +2,13 @@ from django.contrib import messages
 from django.db import transaction
 from django.shortcuts import get_object_or_404, redirect, render
 
-from .forms import ChoreDefinitionForm, HouseholdSetupForm, MemberRenameForm
-from .models import ChoreDefinition, HouseholdMember
+from .forms import (
+    ChoreDefinitionForm,
+    HouseholdSetupForm,
+    MemberRenameForm,
+    OccurrenceAssignmentForm,
+)
+from .models import ChoreAssignment, ChoreDefinition, ChoreOccurrence, HouseholdMember
 from .catalog import CATALOG, CATALOG_BY_SLUG
 
 
@@ -97,6 +102,46 @@ def catalog_add(request, slug):
     else:
         messages.info(request, f"{chore.name} is already in your Chore Library.")
     return redirect("chores:library")
+
+
+def occurrences(request):
+    if HouseholdMember.objects.count() != 2:
+        return redirect("chores:setup")
+    occurrence_forms = [
+        (occurrence, OccurrenceAssignmentForm(initial={"member": getattr(getattr(occurrence, "assignment", None), "member_id", None)}))
+        for occurrence in ChoreOccurrence.objects.select_related("definition").order_by("due_date", "id")
+    ]
+    return render(request, "chores/occurrences.html", {"occurrence_forms": occurrence_forms})
+
+
+def assign_occurrence(request, pk):
+    if request.method != "POST":
+        return redirect("chores:occurrences")
+    occurrence = get_object_or_404(ChoreOccurrence, pk=pk)
+    form = OccurrenceAssignmentForm(request.POST)
+    if not form.is_valid():
+        messages.error(request, "Choose one of the two household members.")
+        return redirect("chores:occurrences")
+
+    member = form.cleaned_data["member"]
+    assignment = getattr(occurrence, "assignment", None)
+    action = request.POST.get("action")
+    if action == "claim":
+        if assignment is not None:
+            messages.error(request, "This occurrence is already assigned.")
+            return redirect("chores:occurrences")
+        ChoreAssignment.objects.create(occurrence=occurrence, member=member)
+        messages.success(request, "Occurrence claimed.")
+    elif action == "reassign":
+        if assignment is None:
+            messages.error(request, "Claim this unassigned occurrence first.")
+            return redirect("chores:occurrences")
+        assignment.member = member
+        assignment.save(update_fields=["member"])
+        messages.success(request, "Occurrence reassigned.")
+    else:
+        messages.error(request, "That assignment action is not available.")
+    return redirect("chores:occurrences")
 
 
 def setup(request):

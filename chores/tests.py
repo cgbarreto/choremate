@@ -334,6 +334,73 @@ class RecurrenceGenerationTests(TestCase):
         self.assertEqual(alternating_assignments, [self.alex.id, self.sam.id])
 
 
+class OccurrenceAssignmentTests(TestCase):
+    def setUp(self):
+        self.alex = HouseholdMember.objects.create(name="Alex")
+        self.sam = HouseholdMember.objects.create(name="Sam")
+        self.definition = ChoreDefinition.objects.create(
+            name="Claimable chore",
+            category=ChoreDefinition.Category.CLEANING,
+            effort_score=2,
+            priority=ChoreDefinition.Priority.LOW,
+            recurrence=ChoreDefinition.Recurrence.ONE_TIME,
+            assignment_type=ChoreDefinition.AssignmentType.UNASSIGNED,
+        )
+        self.occurrence = ChoreOccurrence.objects.create(
+            definition=self.definition,
+            due_date=date(2026, 9, 12),
+            chore_name=self.definition.name,
+            category=self.definition.category,
+            effort_score=self.definition.effort_score,
+            priority=self.definition.priority,
+            recurrence=self.definition.recurrence,
+        )
+
+    def test_unassigned_occurrence_can_be_claimed(self):
+        response = self.client.post(
+            f"/occurrences/{self.occurrence.id}/assign/",
+            {"member": self.alex.id, "action": "claim"},
+        )
+
+        self.assertRedirects(response, "/occurrences/")
+        self.assertEqual(self.occurrence.assignment.member, self.alex)
+
+    def test_assigned_occurrence_can_be_reassigned_without_changing_definition(self):
+        assignment = ChoreAssignment.objects.create(occurrence=self.occurrence, member=self.alex)
+
+        response = self.client.post(
+            f"/occurrences/{self.occurrence.id}/assign/",
+            {"member": self.sam.id, "action": "reassign"},
+        )
+
+        self.assertRedirects(response, "/occurrences/")
+        assignment.refresh_from_db()
+        self.assertEqual(assignment.member, self.sam)
+        self.assertEqual(self.occurrence.definition_id, self.definition.id)
+
+    def test_claiming_an_already_assigned_occurrence_is_rejected(self):
+        ChoreAssignment.objects.create(occurrence=self.occurrence, member=self.alex)
+
+        response = self.client.post(
+            f"/occurrences/{self.occurrence.id}/assign/",
+            {"member": self.sam.id, "action": "claim"},
+            follow=True,
+        )
+
+        self.assertContains(response, "already assigned")
+        self.assertEqual(self.occurrence.assignment.member, self.alex)
+
+    def test_invalid_member_is_rejected(self):
+        response = self.client.post(
+            f"/occurrences/{self.occurrence.id}/assign/",
+            {"member": 999, "action": "claim"},
+            follow=True,
+        )
+
+        self.assertContains(response, "Choose one of the two household members.")
+        self.assertFalse(ChoreAssignment.objects.filter(occurrence=self.occurrence).exists())
+
+
 class PersistenceBoundaryTests(TestCase):
     def setUp(self):
         self.member = HouseholdMember.objects.create(name="Alex")
