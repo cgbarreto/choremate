@@ -788,6 +788,8 @@ class HistoryViewTests(TestCase):
         self.assertEqual(WeeklySummary.objects.count(), 2)
         self.assertEqual(WeeklySummary.objects.get(member=self.alex).planned_effort_points, 3)
         self.assertEqual(WeeklySummary.objects.get(member=self.sam).actual_effort_points, 3)
+        self.assertEqual(response.content.decode().count('value="2026-08-24"'), 1)
+        self.assertContains(response, "Aug. 24, 2026 to Aug. 30, 2026")
 
     def test_history_reports_empty_state_without_closed_weeks(self):
         response = self.client.get("/history/")

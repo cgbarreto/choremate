@@ -12,8 +12,8 @@
             <form method="get">
                 <label for="history-week">Closed week</label>
                 <select id="history-week" name="week">
-                    {% for week_start in week_starts %}
-                        <option value="{{ week_start|date:'Y-m-d' }}"{% if week_start == selected_start %} selected{% endif %}>{{ week_start }} to {{ week_start|date:'Y-m-d' }}</option>
+                    {% for week_start, week_end in week_options %}
+                        <option value="{{ week_start|date:'Y-m-d' }}"{% if week_start == selected_start %} selected{% endif %}>{{ week_start }} to {{ week_end }}</option>
                     {% endfor %}
                 </select>
                 <button type="submit">View week</button>

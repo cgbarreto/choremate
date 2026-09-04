@@ -246,7 +246,9 @@ def history(request):
         return redirect("chores:setup")
     current_day = date.today()
     persist_closed_week_summaries(current_day)
-    week_starts = list(WeeklySummary.objects.values_list("week_start", flat=True).distinct())
+    week_starts = sorted(
+        set(WeeklySummary.objects.values_list("week_start", flat=True)), reverse=True
+    )
     selected_start = None
     requested_start = request.GET.get("week")
     if requested_start:
@@ -279,6 +281,7 @@ def history(request):
         "chores/history.html",
         {
             "week_starts": week_starts,
+            "week_options": [(week_start, week_start + timedelta(days=6)) for week_start in week_starts],
             "selected_start": selected_start,
             "selected_end": selected_start + timedelta(days=6) if selected_start else None,
             "summary_rows": summary_rows,
