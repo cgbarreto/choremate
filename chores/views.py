@@ -2,8 +2,8 @@ from django.contrib import messages
 from django.db import transaction
 from django.shortcuts import get_object_or_404, redirect, render
 
-from .forms import HouseholdSetupForm, MemberRenameForm
-from .models import HouseholdMember
+from .forms import ChoreDefinitionForm, HouseholdSetupForm, MemberRenameForm
+from .models import ChoreDefinition, HouseholdMember
 
 
 def home(request):
@@ -21,6 +21,46 @@ def home(request):
         "chores/home.html",
         {"members": members, "active_member_id": active_member_id},
     )
+
+
+def library(request):
+    if HouseholdMember.objects.count() != 2:
+        return redirect("chores:setup")
+    chores = ChoreDefinition.objects.select_related("fixed_member").all()
+    return render(request, "chores/library.html", {"chores": chores})
+
+
+def chore_create(request):
+    if HouseholdMember.objects.count() != 2:
+        return redirect("chores:setup")
+    form = ChoreDefinitionForm(request.POST or None)
+    if request.method == "POST" and form.is_valid():
+        form.save()
+        messages.success(request, "Chore created.")
+        return redirect("chores:library")
+    return render(request, "chores/chore_form.html", {"form": form, "heading": "Add chore"})
+
+
+def chore_edit(request, pk):
+    if HouseholdMember.objects.count() != 2:
+        return redirect("chores:setup")
+    chore = get_object_or_404(ChoreDefinition, pk=pk)
+    form = ChoreDefinitionForm(request.POST or None, instance=chore)
+    if request.method == "POST" and form.is_valid():
+        form.save()
+        messages.success(request, "Chore updated.")
+        return redirect("chores:library")
+    return render(request, "chores/chore_form.html", {"form": form, "heading": "Edit chore", "chore": chore})
+
+
+def chore_toggle(request, pk):
+    if request.method != "POST":
+        return redirect("chores:library")
+    chore = get_object_or_404(ChoreDefinition, pk=pk)
+    chore.is_active = not chore.is_active
+    chore.save(update_fields=["is_active", "updated_at"])
+    messages.success(request, f"Chore {'activated' if chore.is_active else 'deactivated'}.")
+    return redirect("chores:library")
 
 
 def setup(request):

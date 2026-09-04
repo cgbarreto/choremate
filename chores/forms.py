@@ -1,5 +1,7 @@
 from django import forms
 
+from .models import ChoreDefinition, HouseholdMember
+
 
 class HouseholdSetupForm(forms.Form):
     member_one = forms.CharField(
@@ -46,3 +48,49 @@ class MemberRenameForm(forms.Form):
         if not value:
             raise forms.ValidationError("This name is required.")
         return value
+
+
+class ChoreDefinitionForm(forms.ModelForm):
+    class Meta:
+        model = ChoreDefinition
+        fields = (
+            "name",
+            "description",
+            "category",
+            "effort_score",
+            "priority",
+            "recurrence",
+            "assignment_type",
+            "fixed_member",
+        )
+        widgets = {
+            "description": forms.Textarea(attrs={"rows": 3}),
+            "effort_score": forms.NumberInput(attrs={"min": 1, "max": 5}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["fixed_member"].queryset = HouseholdMember.objects.order_by("id")
+        self.fields["fixed_member"].required = False
+
+    def clean_name(self):
+        name = self.cleaned_data["name"].strip()
+        if not name:
+            raise forms.ValidationError("A chore name is required.")
+        return name
+
+    def clean_effort_score(self):
+        effort_score = self.cleaned_data["effort_score"]
+        if not 1 <= effort_score <= 5:
+            raise forms.ValidationError("Effort score must be between 1 and 5.")
+        return effort_score
+
+    def clean(self):
+        cleaned_data = super().clean()
+        assignment_type = cleaned_data.get("assignment_type")
+        fixed_member = cleaned_data.get("fixed_member")
+        if assignment_type == ChoreDefinition.AssignmentType.FIXED and fixed_member is None:
+            self.add_error("fixed_member", "Select a member for a fixed chore.")
+        if assignment_type != ChoreDefinition.AssignmentType.FIXED:
+            cleaned_data["fixed_member"] = None
+        return cleaned_data

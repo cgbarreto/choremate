@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{{ heading }} - Choremate</title>
+</head>
+<body>
+    <main>
+        <h1>{{ heading }}</h1>
+        <form method="post">
+            {% csrf_token %}
+            {{ form.non_field_errors }}
+            {% for field in form %}
+                <p>
+                    {{ field.label_tag }}
+                    {{ field }}
+                    {{ field.errors }}
+                </p>
+            {% endfor %}
+            <button type="submit">Save chore</button>
+        </form>
+        <p><a href="{% url 'chores:library' %}">Cancel</a></p>
+    </main>
+</body>
+</html>

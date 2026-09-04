@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Chore Library - Choremate</title>
+</head>
+<body>
+    <main>
+        <h1>Chore Library</h1>
+        {% if messages %}
+            {% for message in messages %}
+                <p role="status">{{ message }}</p>
+            {% endfor %}
+        {% endif %}
+        <p><a href="{% url 'chores:chore_create' %}">Add chore</a></p>
+        {% if chores %}
+            <ul>
+                {% for chore in chores %}
+                    <li>
+                        <article aria-labelledby="chore-{{ chore.id }}-name">
+                            <h2 id="chore-{{ chore.id }}-name">{{ chore.name }}</h2>
+                            <p>{{ chore.category }} · {{ chore.effort_score }} effort · {{ chore.priority }} priority · {{ chore.recurrence }} · {{ chore.assignment_type }}</p>
+                            {% if chore.fixed_member %}<p>Fixed member: {{ chore.fixed_member.name }}</p>{% endif %}
+                            <p>Status: {% if chore.is_active %}Active{% else %}Inactive{% endif %}</p>
+                            <a href="{% url 'chores:chore_edit' chore.id %}">Edit</a>
+                            <form method="post" action="{% url 'chores:chore_toggle' chore.id %}" style="display: inline">
+                                {% csrf_token %}
+                                <button type="submit">{% if chore.is_active %}Deactivate{% else %}Activate{% endif %}</button>
+                            </form>
+                        </article>
+                    </li>
+                {% endfor %}
+            </ul>
+        {% else %}
+            <p>No chore definitions yet. Add your first chore to get started.</p>
+        {% endif %}
+        <p><a href="{% url 'chores:home' %}">Back to Choremate</a></p>
+    </main>
+</body>
+</html>

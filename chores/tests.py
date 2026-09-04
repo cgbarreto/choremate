@@ -90,6 +90,112 @@ class MemberSettingsTests(TestCase):
         self.assertEqual(self.alex.name, "Alex")
 
 
+class ChoreLibraryTests(TestCase):
+    def setUp(self):
+        self.alex = HouseholdMember.objects.create(name="Alex")
+        self.sam = HouseholdMember.objects.create(name="Sam")
+        self.chore_data = {
+            "name": "Clean bathroom",
+            "description": "Weekly bathroom cleaning",
+            "category": ChoreDefinition.Category.CLEANING,
+            "effort_score": 4,
+            "priority": ChoreDefinition.Priority.MEDIUM,
+            "recurrence": ChoreDefinition.Recurrence.WEEKLY,
+            "assignment_type": ChoreDefinition.AssignmentType.FIXED,
+            "fixed_member": self.alex,
+        }
+        self.chore_form_data = {**self.chore_data, "fixed_member": self.alex.id}
+
+    def test_library_lists_active_and_inactive_chores(self):
+        active = ChoreDefinition.objects.create(**self.chore_data)
+        inactive = ChoreDefinition.objects.create(
+            **{**self.chore_data, "name": "Wash dishes", "is_active": False}
+        )
+
+        response = self.client.get("/library/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, active.name)
+        self.assertContains(response, inactive.name)
+        self.assertContains(response, "Active")
+        self.assertContains(response, "Inactive")
+
+    def test_user_can_create_and_edit_a_chore_definition(self):
+        response = self.client.post("/library/add/", self.chore_form_data)
+
+        self.assertRedirects(response, "/library/")
+        chore = ChoreDefinition.objects.get(name="Clean bathroom")
+        self.assertEqual(chore.effort_score, 4)
+
+        response = self.client.post(
+            f"/library/{chore.id}/edit/",
+            {**self.chore_form_data, "name": "Deep clean bathroom", "effort_score": 5},
+        )
+
+        self.assertRedirects(response, "/library/")
+        chore.refresh_from_db()
+        self.assertEqual(chore.name, "Deep clean bathroom")
+        self.assertEqual(chore.effort_score, 5)
+
+    def test_fixed_chore_requires_a_member_and_other_types_clear_member(self):
+        invalid = {**self.chore_form_data, "fixed_member": ""}
+        response = self.client.post("/library/add/", invalid)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Select a member for a fixed chore.")
+        self.assertEqual(ChoreDefinition.objects.count(), 0)
+
+        response = self.client.post(
+            "/library/add/",
+            {**self.chore_form_data, "assignment_type": ChoreDefinition.AssignmentType.UNASSIGNED},
+        )
+
+        self.assertRedirects(response, "/library/")
+        chore = ChoreDefinition.objects.get()
+        self.assertIsNone(chore.fixed_member)
+
+    def test_invalid_effort_does_not_save(self):
+        response = self.client.post("/library/add/", {**self.chore_form_data, "effort_score": 6})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Effort score must be between 1 and 5.")
+        self.assertEqual(ChoreDefinition.objects.count(), 0)
+
+    def test_toggle_deactivates_and_reactivates_without_deleting(self):
+        chore = ChoreDefinition.objects.create(**self.chore_data)
+
+        response = self.client.post(f"/library/{chore.id}/toggle/")
+
+        self.assertRedirects(response, "/library/")
+        chore.refresh_from_db()
+        self.assertFalse(chore.is_active)
+        self.assertEqual(ChoreDefinition.objects.count(), 1)
+
+        self.client.post(f"/library/{chore.id}/toggle/")
+        chore.refresh_from_db()
+        self.assertTrue(chore.is_active)
+
+    def test_editing_definition_does_not_change_an_existing_occurrence_snapshot(self):
+        chore = ChoreDefinition.objects.create(**self.chore_data)
+        occurrence = ChoreOccurrence.objects.create(
+            definition=chore,
+            due_date=date(2026, 9, 7),
+            chore_name=chore.name,
+            category=chore.category,
+            effort_score=chore.effort_score,
+            priority=chore.priority,
+        )
+
+        self.client.post(
+            f"/library/{chore.id}/edit/",
+            {**self.chore_form_data, "effort_score": 5, "name": "Deep clean bathroom"},
+        )
+
+        occurrence.refresh_from_db()
+        self.assertEqual(occurrence.chore_name, "Clean bathroom")
+        self.assertEqual(occurrence.effort_score, 4)
+
+
 class PersistenceBoundaryTests(TestCase):
     def setUp(self):
         self.member = HouseholdMember.objects.create(name="Alex")
