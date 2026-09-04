@@ -19,7 +19,7 @@ This project is part of the [AI Dev Tools Zoomcamp](https://aishippingblog.com/p
 
 ## Project status
 
-The project is currently in the setup and architecture phase. The product scope is documented in [`_docs/plan.md`](_docs/plan.md).
+The project is currently in the foundation phase. The product scope is documented in [`_docs/plan.md`](_docs/plan.md), and the implementation backlog is tracked primarily in [GitHub issues](https://github.com/cgbarreto/choremate/issues).
 
 ## Requirements
 
@@ -45,7 +45,7 @@ source .venv/bin/activate
 Install and synchronize dependencies:
 
 ```bash
-uv sync
+uv sync --locked
 ```
 
 Run the test suite:
@@ -53,6 +53,17 @@ Run the test suite:
 ```bash
 uv run pytest
 ```
+
+Run the development server:
+
+```bash
+uv run python manage.py migrate
+uv run python manage.py runserver
+```
+
+The default configuration is suitable for local development and uses SQLite.
+Set `DJANGO_SECRET_KEY`, `DJANGO_DEBUG`, or `DJANGO_ALLOWED_HOSTS` when a
+different local configuration is needed.
 
 ## Documentation
 
